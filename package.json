@@ -1,0 +1,14 @@
+{
+  "name": "daily-habit-game",
+  "version": "1.0.0",
+  "description": "DailyHabit - 每日习惯打卡游戏化Web应用",
+  "main": "server/app.js",
+  "scripts": {
+    "start": "node server/app.js",
+    "dev": "npx nodemon server/app.js",
+    "client": "cd client && npm start",
+    "install-all": "npm install && cd client && npm install"
+  },
+  "keywords": ["habit", "gamification", "daily-checkin"],
+  "license": "MIT"
+}
