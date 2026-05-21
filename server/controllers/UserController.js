@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 用户模块控制器
+ * 作者：李亚恒
+ */
+
 const UserService = require('../services/UserService');
 
 const register = async (req, res, next) => {

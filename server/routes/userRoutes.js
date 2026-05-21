@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 用户模块路由
+ * 作者：李亚恒
+ */
+
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');

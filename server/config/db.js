@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 数据库连接配置
+ * 作者：李亚恒
+ */
+
 const mongoose = require('mongoose');
 
 const connectDB = async () => {

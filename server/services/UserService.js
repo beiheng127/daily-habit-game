@@ -1,3 +1,9 @@
+/**
+ * DailyHabit 用户管理模块
+ * 作者：李亚恒（组长/PM）
+ * 负责：用户注册/登录/信息管理/JWT认证/等级查询
+ */
+
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -31,9 +37,14 @@ const register = async (username, password, email) => {
     throw { status: 400, message: '用户名需为3-20位字母、数字或下划线' };
   }
 
-  // 校验 password 长度
-  if (!password || password.length < 6 || password.length > 20) {
-    throw { status: 400, message: '密码需为6-20位字符' };
+  // 校验 password 强度
+  if (!password || password.length < 8 || password.length > 30) {
+    throw { status: 400, message: '密码需为8-30位' };
+  }
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasDigit = /[0-9]/.test(password);
+  if (!hasLetter || !hasDigit) {
+    throw { status: 400, message: '密码必须同时包含字母和数字' };
   }
 
   // 校验 email 格式
@@ -99,7 +110,10 @@ const login = async (username, password) => {
       avatar: user.avatar,
       level: user.level,
       exp: user.exp,
-      coins: user.coins
+      coins: user.coins,
+      inventory: user.inventory,
+      activeFrame: user.activeFrame,
+      activeTheme: user.activeTheme
     }
   };
 };
@@ -144,8 +158,13 @@ const changePassword = async (userId, oldPassword, newPassword) => {
     throw { status: 400, message: '原密码错误' };
   }
 
-  if (!newPassword || newPassword.length < 6 || newPassword.length > 20) {
-    throw { status: 400, message: '新密码需为6-20位字符' };
+  if (!newPassword || newPassword.length < 8 || newPassword.length > 30) {
+    throw { status: 400, message: '新密码需为8-30位' };
+  }
+  const hasLetter = /[a-zA-Z]/.test(newPassword);
+  const hasDigit = /[0-9]/.test(newPassword);
+  if (!hasLetter || !hasDigit) {
+    throw { status: 400, message: '密码必须同时包含字母和数字' };
   }
 
   user.password = await bcrypt.hash(newPassword, 10);

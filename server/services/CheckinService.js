@@ -1,3 +1,9 @@
+/**
+ * DailyHabit 打卡系统模块
+ * 作者：朱其浩（技术负责人）
+ * 负责：打卡记录/习惯CRUD/连续天数计算
+ */
+
 const Checkin = require('../models/Checkin');
 const Habit = require('../models/Habit');
 const User = require('../models/User');
@@ -27,6 +33,19 @@ const getYesterdayStr = () => {
 /**
  * 执行打卡
  */
+/**
+ * 根据连续天数计算打卡经验和金币奖励（阶梯式）
+ * 天数越多奖励越高，激励长期坚持
+ */
+const getStreakBonus = (currentStreak) => {
+  if (currentStreak >= 31) return { exp: 30, coins: 15 };
+  if (currentStreak >= 15) return { exp: 25, coins: 12 };
+  if (currentStreak >= 8)  return { exp: 20, coins: 10 };
+  if (currentStreak >= 4)  return { exp: 15, coins: 8 };
+  if (currentStreak >= 2)  return { exp: 12, coins: 6 };
+  return { exp: 10, coins: 5 };
+};
+
 const checkin = async (userId, habitId, note) => {
   const today = getTodayStr();
 
@@ -66,9 +85,10 @@ const checkin = async (userId, habitId, note) => {
   }
   await user.save();
 
-  // 发放打卡奖励
-  const expResult = await GameService.addExp(userId, 10);
-  const coinsResult = await GameService.addCoins(userId, 5);
+  // 发放打卡奖励（根据连续天数阶梯计算）
+  const bonus = getStreakBonus(habit.currentStreak);
+  const expResult = await GameService.addExp(userId, bonus.exp);
+  const coinsResult = await GameService.addCoins(userId, bonus.coins);
 
   // 检查成就
   const achievementResult = await GameService.checkAchievements(userId);
@@ -76,8 +96,9 @@ const checkin = async (userId, habitId, note) => {
   return {
     checkinId: checkinRecord._id,
     date: today,
-    expGained: 10,
-    coinsGained: 5,
+    streak: habit.currentStreak,
+    expGained: bonus.exp,
+    coinsGained: bonus.coins,
     newExp: expResult.newExp,
     newLevel: expResult.newLevel,
     newAchievements: achievementResult.newUnlocks
@@ -112,9 +133,12 @@ const getTodayStatus = async (userId, date) => {
  */
 const getHistory = async (userId, startDate, endDate, habitId) => {
   const today = getTodayStr();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const defaultStart = thirtyDaysAgo.toISOString().split('T')[0];
+  // 用东八区计算30天前
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const cst = new Date(now.getTime() - offset + 8 * 3600000);
+  cst.setDate(cst.getDate() - 30);
+  const defaultStart = cst.toISOString().split('T')[0];
 
   const query = { userId };
   query.date = {

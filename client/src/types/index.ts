@@ -11,6 +11,14 @@ export interface User {
   streak: number;
   totalCheckins: number;
   createdAt?: string;
+  inventory?: {
+    skipCards: number;
+    renameCards: number;
+    avatarFrames: string[];
+    themeColors: string[];
+  };
+  activeFrame?: string;
+  activeTheme?: string;
 }
 
 // 登录/注册响应
@@ -75,6 +83,7 @@ export interface CheckinHistory {
 export interface CheckinResult {
   checkinId: string;
   date: string;
+  streak: number;
   expGained: number;
   coinsGained: number;
   newExp: number;

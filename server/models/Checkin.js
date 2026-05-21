@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 打卡记录数据模型
+ * 作者：朱其浩
+ */
+
 const mongoose = require('mongoose');
 
 const checkinSchema = new mongoose.Schema({

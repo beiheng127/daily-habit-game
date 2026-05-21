@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 用户数据模型
+ * 作者：李亚恒
+ */
+
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -30,7 +35,16 @@ const userSchema = new mongoose.Schema({
   coins: { type: Number, default: 0 },
   streak: { type: Number, default: 0 },
   totalCheckins: { type: Number, default: 0 },
-  lastLoginDate: { type: String, default: '' }
+  lastLoginDate: { type: String, default: '' },
+  inventory: {
+    skipCards: { type: Number, default: 0 },
+    renameCards: { type: Number, default: 0 },
+    avatarFrames: [{ type: String }],
+    themeColors: [{ type: String }]
+  },
+  // 当前装备的外观
+  activeFrame: { type: String, default: '' },
+  activeTheme: { type: String, default: '' }
 }, {
   timestamps: true
 });

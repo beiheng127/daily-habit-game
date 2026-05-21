@@ -11,24 +11,22 @@ const Navbar: React.FC = () => {
     { path: '/habits', label: '习惯', icon: '📋' },
     { path: '/history', label: '历史', icon: '📅' },
     { path: '/achievements', label: '成就', icon: '🏆' },
+    { path: '/shop', label: '商店', icon: '🛒' },
+    { path: '/leaderboard', label: '排行', icon: '📊' },
     { path: '/profile', label: '我的', icon: '👤' }
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+    <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-soft z-50">
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-green-600">DailyHabit</Link>
+        <Link to="/" className="text-xl font-bold bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent">DailyHabit</Link>
 
-        <div className="flex gap-4">
+        <div className="flex gap-1">
           {links.map(link => (
             <Link
               key={link.path}
               to={link.path}
-              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm ${
-                location.pathname === link.path
-                  ? 'bg-green-100 text-green-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={'flex items-center gap-1 px-2.5 py-2 rounded-xl text-sm transition-all ' + (location.pathname === link.path ? 'bg-brand-100 text-brand-700 font-medium' : 'text-gray-500 hover:bg-gray-100')}
             >
               <span>{link.icon}</span>
               <span className="hidden sm:inline">{link.label}</span>
@@ -37,11 +35,11 @@ const Navbar: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">{user?.nickname}</span>
-          <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs">
+          <span className="text-sm text-gray-600 hidden md:inline">{user?.nickname}</span>
+          <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-lg text-xs font-medium">
             Lv.{user?.level} 💰{user?.coins}
           </span>
-          <button onClick={logout} className="text-sm text-red-500 hover:text-red-700">
+          <button onClick={logout} className="text-sm text-red-400 hover:text-red-600 transition-colors">
             退出
           </button>
         </div>

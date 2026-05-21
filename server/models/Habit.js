@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 习惯数据模型
+ * 作者：朱其浩
+ */
+
 const mongoose = require('mongoose');
 
 const habitSchema = new mongoose.Schema({

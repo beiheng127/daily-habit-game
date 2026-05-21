@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 打卡模块控制器
+ * 作者：朱其浩
+ */
+
 const CheckinService = require('../services/CheckinService');
 
 const checkin = async (req, res, next) => {

@@ -1,56 +1,82 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { gameApi } from '../services/api';
 import { Achievement } from '../types';
 import AchievementCard from '../components/AchievementCard';
+import Skeleton from '../components/Skeleton';
 
 const AchievementPage: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await gameApi.getAchievements();
-        setAchievements(res.data);
-      } catch (err) {
-        console.error('获取成就失败', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
+  const fetchAchievements = useCallback(async () => {
+    try {
+      const res = await gameApi.getAchievements();
+      setAchievements(res.data);
+    } catch (err) {
+      console.error('加载成就失败', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading) return <div className="text-center py-20 text-gray-400">加载中...</div>;
+  useEffect(() => { fetchAchievements(); }, [fetchAchievements]);
 
-  const unlocked = achievements.filter(a => a.unlocked);
-  const locked = achievements.filter(a => !a.unlocked);
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const totalCount = achievements.length;
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <Skeleton type="text" count={1} className="h-8 w-48 mb-6" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton type="card" count={6} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold text-gray-800 mb-2">成就墙</h1>
-      <p className="text-sm text-gray-400 mb-6">已解锁 {unlocked.length}/{achievements.length}</p>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-gray-800">成就</h1>
+        <span className="text-sm text-gray-400">
+          {unlockedCount}/{totalCount} 已解锁
+        </span>
+      </div>
 
-      {unlocked.length > 0 && (
-        <>
-          <h2 className="text-sm font-semibold text-gray-500 mb-3">已解锁</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-            {unlocked.map(a => (
-              <AchievementCard key={a.achievementId} achievement={a} />
-            ))}
-          </div>
-        </>
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-4 mb-4"
+      >
+        <div className="w-full bg-gray-100 rounded-full h-2.5">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${totalCount > 0 ? (unlockedCount / totalCount) * 100 : 0}%` }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="bg-gradient-to-r from-brand-500 to-accent-500 h-2.5 rounded-full"
+          />
+        </div>
+      </motion.div>
 
-      {locked.length > 0 && (
-        <>
-          <h2 className="text-sm font-semibold text-gray-500 mb-3">未解锁</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {locked.map(a => (
-              <AchievementCard key={a.achievementId} achievement={a} />
-            ))}
-          </div>
-        </>
+      <div className="grid grid-cols-2 gap-3">
+        {achievements.map((ach, i) => (
+          <motion.div
+            key={ach.achievementId}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+          >
+            <AchievementCard achievement={ach} />
+          </motion.div>
+        ))}
+      </div>
+
+      {achievements.length === 0 && (
+        <div className="glass-card p-10 text-center text-gray-400">
+          暂无成就数据
+        </div>
       )}
     </div>
   );

@@ -1,7 +1,14 @@
+/**
+ * DailyHabit 每日习惯打卡游戏 - 后端入口
+ * 作者：李亚恒
+ */
+
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const Achievement = require('./models/Achievement');
+const validate = require('./middleware/validate');
 
 // 路由
 const userRoutes = require('./routes/userRoutes');
@@ -12,25 +19,55 @@ const app = express();
 
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+// 输入清理中间件（防 NoSQL 注入 + XSS）
+app.use(validate.sanitize);
+
+// 全局限流：每IP每分钟最多100次请求
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { code: 429, message: '请求过于频繁，请稍后再试', data: null }
+}));
+
+// 认证接口限流：注册/登录每IP每分钟最多5次（防暴力破解）
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { code: 429, message: '操作过于频繁，请1分钟后再试', data: null }
+});
 
 // 路由挂载
 app.use('/api/users', userRoutes);
 app.use('/api', checkinRoutes);
 app.use('/api/game', gameRoutes);
 
+// 给认证路由单独加限流
+app.use('/api/users/register', authLimiter);
+app.use('/api/users/login', authLimiter);
+
 // 健康检查
 app.get('/api/health', (req, res) => {
   res.json({ code: 200, message: 'DailyHabit API is running', data: null });
 });
 
-// 错误处理中间件
+// 错误处理中间件（带日志）
 app.use((err, req, res, next) => {
-  console.error(err.stack || err.message);
   const status = err.status || 500;
+  const logEntry = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${status} - ${err.message}`;
+  if (status >= 500) {
+    console.error(logEntry, err.stack || '');
+  } else {
+    console.warn(logEntry);
+  }
   res.status(status).json({
     code: status,
-    message: err.message || '服务器内部错误',
+    message: status >= 500 ? '服务器内部错误' : err.message,
     data: null
   });
 });
@@ -56,7 +93,7 @@ const initAchievements = async () => {
 };
 
 // 启动服务
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 const startServer = async () => {
   await connectDB();

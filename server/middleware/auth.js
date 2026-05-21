@@ -1,3 +1,8 @@
+/**
+ * DailyHabit JWT 认证中间件
+ * 作者：李亚恒
+ */
+
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dailyhabit_secret_key';

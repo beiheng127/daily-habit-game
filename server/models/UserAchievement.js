@@ -1,3 +1,8 @@
+/**
+ * DailyHabit 用户-成就关联数据模型
+ * 作者：张嵩林
+ */
+
 const mongoose = require('mongoose');
 
 const userAchievementSchema = new mongoose.Schema({
