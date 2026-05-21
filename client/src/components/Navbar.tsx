@@ -33,7 +33,7 @@ const Navbar: React.FC = () => {
             </Link>
           ))}
         </div>
-
+        {/* todo:用户的金钱和等级未同步，并且需要pinia全局管理 */}
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600 hidden md:inline">{user?.nickname}</span>
           <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-lg text-xs font-medium">
