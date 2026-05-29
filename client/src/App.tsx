@@ -68,7 +68,7 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen">
       <ThemeInitializer />
       {isAuthenticated && <Navbar />}
-      <div className={isAuthenticated ? 'pt-16' : ''}>
+      <div className={isAuthenticated ? 'pt-0 md:pt-16 pb-16 md:pb-0' : ''}>
         <AnimatedRoutes />
       </div>
     </div>

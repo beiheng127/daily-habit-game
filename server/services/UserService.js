@@ -8,13 +8,18 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dailyhabit_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.warn('[安全警告] 未设置 JWT_SECRET 环境变量，正在使用不安全的默认密钥！请在生产环境中设置 JWT_SECRET。');
+}
+const SECRET = JWT_SECRET || 'dailyhabit_secret_key_dev_only';
 
 /**
  * 生成JWT Token
  */
 const generateToken = (userId, username) => {
-  return jwt.sign({ userId, username }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId, username }, SECRET, { expiresIn: '7d' });
 };
 
 /**

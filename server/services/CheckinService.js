@@ -49,22 +49,18 @@ const getStreakBonus = (currentStreak) => {
 const checkin = async (userId, habitId, note) => {
   const today = getTodayStr();
 
-  // 验证 habit 属于当前用户
   const habit = await Habit.findOne({ _id: habitId, userId });
   if (!habit) {
     throw { status: 404, message: '习惯不存在或不属于当前用户' };
   }
 
-  // 检查今天是否已打卡
   const existing = await Checkin.findOne({ userId, habitId, date: today });
   if (existing) {
     throw { status: 409, message: '今天已打卡' };
   }
 
-  // 创建打卡记录
   const checkinRecord = await Checkin.create({ userId, habitId, date: today, note: note || '' });
 
-  // 计算连续天数
   const yesterday = getYesterdayStr();
   const yesterdayCheckin = await Checkin.findOne({ userId, habitId, date: yesterday });
 
@@ -75,32 +71,32 @@ const checkin = async (userId, habitId, note) => {
   }
   await habit.save();
 
-  // 更新用户总打卡数
+  const bonus = getStreakBonus(habit.currentStreak);
+  const totalExp = bonus.exp;
+  const totalCoins = bonus.coins;
+
   const user = await User.findById(userId);
   user.totalCheckins += 1;
-
-  // 更新用户最长连续打卡记录
   if (habit.currentStreak > user.streak) {
     user.streak = habit.currentStreak;
   }
+  user.exp += totalExp;
+  const { level: newLevel } = UserService.calculateLevel(user.exp);
+  const leveledUp = newLevel > user.level;
+  user.level = newLevel;
+  user.coins += totalCoins;
   await user.save();
 
-  // 发放打卡奖励（根据连续天数阶梯计算）
-  const bonus = getStreakBonus(habit.currentStreak);
-  const expResult = await GameService.addExp(userId, bonus.exp);
-  const coinsResult = await GameService.addCoins(userId, bonus.coins);
-
-  // 检查成就
   const achievementResult = await GameService.checkAchievements(userId);
 
   return {
     checkinId: checkinRecord._id,
     date: today,
     streak: habit.currentStreak,
-    expGained: bonus.exp,
-    coinsGained: bonus.coins,
-    newExp: expResult.newExp,
-    newLevel: expResult.newLevel,
+    expGained: totalExp,
+    coinsGained: totalCoins,
+    newExp: user.exp,
+    newLevel: user.level,
     newAchievements: achievementResult.newUnlocks
   };
 };
@@ -121,7 +117,8 @@ const getTodayStatus = async (userId, date) => {
       icon: habit.icon,
       color: habit.color,
       checkedIn: !!checked,
-      note: checked ? checked.note : null
+      note: checked ? checked.note : null,
+      currentStreak: habit.currentStreak
     };
   });
 

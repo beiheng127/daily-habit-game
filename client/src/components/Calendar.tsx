@@ -5,14 +5,21 @@ interface Props {
   onDateSelect?: (date: string) => void;
 }
 
-const Calendar: React.FC<Props> = ({ checkinDates, onDateSelect }) => {
+const getCSTDate = () => {
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
+  const offset = now.getTimezoneOffset() * 60000;
+  const cst = new Date(now.getTime() - offset + 8 * 3600000);
+  return cst;
+};
+
+const Calendar: React.FC<Props> = ({ checkinDates, onDateSelect }) => {
+  const cstNow = getCSTDate();
+  const [year, setYear] = useState(cstNow.getFullYear());
+  const [month, setMonth] = useState(cstNow.getMonth());
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = cstNow.toISOString().split('T')[0];
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }

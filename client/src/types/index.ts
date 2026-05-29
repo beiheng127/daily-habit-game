@@ -59,6 +59,7 @@ export interface CheckinStatus {
   color: string;
   checkedIn: boolean;
   note: string | null;
+  currentStreak: number;
 }
 
 export interface TodayStatus {

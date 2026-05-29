@@ -42,14 +42,12 @@ const authLimiter = rateLimit({
   message: { code: 429, message: '操作过于频繁，请1分钟后再试', data: null }
 });
 
-// 路由挂载
+// 路由挂载（限流中间件必须在路由之前）
+app.use('/api/users/register', authLimiter);
+app.use('/api/users/login', authLimiter);
 app.use('/api/users', userRoutes);
 app.use('/api', checkinRoutes);
 app.use('/api/game', gameRoutes);
-
-// 给认证路由单独加限流
-app.use('/api/users/register', authLimiter);
-app.use('/api/users/login', authLimiter);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

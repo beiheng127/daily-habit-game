@@ -5,6 +5,8 @@ import { userApi, gameApi } from '../services/api';
 import { GameStatus } from '../types';
 import LevelBadge from '../components/LevelBadge';
 import Skeleton from '../components/Skeleton';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const AVATAR_FRAMES: Record<string, string> = {
   gold: 'border-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.5)]',
@@ -19,12 +21,7 @@ const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
-
-  const showToast = (message: string, type: string = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
-  };
+  const { toast, showToast } = useToast();
 
   const fetchData = async () => {
     try {
@@ -97,16 +94,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Toast */}
-      {toast && (
-        <motion.div
-          initial={{ y: -60, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className={"fixed top-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl shadow-lg text-white z-50 text-sm font-medium " + (toast.type === 'success' ? 'bg-accent-500' : 'bg-red-500')}
-        >
-          {toast.message}
-        </motion.div>
-      )}
+      <Toast toast={toast} />
 
       <h1 className="text-xl font-bold text-gray-800 mb-6">个人中心</h1>
 

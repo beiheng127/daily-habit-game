@@ -7,13 +7,11 @@
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
 const UserAchievement = require('../models/UserAchievement');
+const Checkin = require('../models/Checkin');
 const UserService = require('./UserService');
 
-const EXP_PER_CHECKIN = 10;
-const COINS_PER_CHECKIN = 5;
 const EXP_PER_LEVEL = 100;
 const COINS_DAILY_LOGIN = 10;
-const STREAK_BONUS_COINS = 3;
 
 /**
  * 增加经验值
@@ -154,9 +152,10 @@ const checkAchievements = async (userId) => {
   const allAchievements = await Achievement.find();
   const unlockedIds = await UserAchievement.find({ userId }).distinct('achievementId');
   const newUnlocks = [];
+  let totalExpReward = 0;
+  let totalCoinsReward = 0;
 
   for (const ach of allAchievements) {
-    // 跳过已解锁的成就
     if (unlockedIds.some(id => id.toString() === ach._id.toString())) continue;
 
     let satisfied = false;
@@ -180,9 +179,8 @@ const checkAchievements = async (userId) => {
 
     if (satisfied) {
       await UserAchievement.create({ userId, achievementId: ach._id });
-      // 发放成就奖励
-      if (ach.reward.exp > 0) await addExp(userId, ach.reward.exp);
-      if (ach.reward.coins > 0) await addCoins(userId, ach.reward.coins);
+      totalExpReward += ach.reward.exp;
+      totalCoinsReward += ach.reward.coins;
       newUnlocks.push({
         key: ach.key,
         name: ach.name,
@@ -191,6 +189,13 @@ const checkAchievements = async (userId) => {
         reward: ach.reward
       });
     }
+  }
+
+  if (totalExpReward > 0 || totalCoinsReward > 0) {
+    user.exp += totalExpReward;
+    user.level = UserService.calculateLevel(user.exp).level;
+    user.coins += totalCoinsReward;
+    await user.save();
   }
 
   return { newUnlocks };
@@ -340,7 +345,6 @@ const getLeaderboard = async (period = 'all') => {
 
   // 周榜/月榜：按打卡记录聚合，统计该时段内打卡次数
   if (period === 'weekly' || period === 'monthly') {
-    const Checkin = require('../models/Checkin');
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
     const cst = new Date(now.getTime() - offset + 8 * 3600000);

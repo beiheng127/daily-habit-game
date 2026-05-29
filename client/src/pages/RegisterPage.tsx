@@ -49,7 +49,7 @@ const RegisterPage: React.FC = () => {
         <input name="username" placeholder="用户名（3-20位字母数字下划线）" value={form.username}
           onChange={handleChange}
           className="w-full p-3 border border-gray-200 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white/80" />
-        <input name="password" type="password" placeholder="密码（6-20位）" value={form.password}
+        <input name="password" type="password" placeholder="密码（8-30位，需含字母和数字）" value={form.password}
           onChange={handleChange}
           className="w-full p-3 border border-gray-200 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white/80" />
         <input name="email" type="email" placeholder="邮箱" value={form.email}

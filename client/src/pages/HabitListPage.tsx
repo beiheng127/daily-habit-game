@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { checkinApi } from '../services/api';
 import { Habit } from '../types';
 import Skeleton from '../components/Skeleton';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const ICONS = ['🏃', '📚', '💧', '🧘', '🎵', '✍️', '💤', '🍎', '🏋️', '📝'];
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
@@ -12,16 +14,11 @@ const HabitListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
+  const { toast, showToast } = useToast();
 
   const [form, setForm] = useState<{ name: string; icon: string; color: string; frequency: string; reminderTime: string }>({
     name: '', icon: '🏃', color: '#6366f1', frequency: 'daily', reminderTime: ''
   });
-
-  const showToast = (message: string, type: string = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
-  };
 
   const fetchHabits = useCallback(async () => {
     try {
@@ -96,20 +93,7 @@ const HabitListPage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -60, opacity: 0 }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl shadow-lg text-white z-50 text-sm font-medium ${
-              toast.type === 'success' ? 'bg-accent-500' : 'bg-red-500'
-            }`}
-          >
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Toast toast={toast} />
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-800">我的习惯</h1>

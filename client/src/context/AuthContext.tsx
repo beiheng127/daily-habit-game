@@ -1,12 +1,14 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { User } from '../types';
-// 用户登录上下文类型
+import { userApi } from '../services/api';
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -14,7 +16,8 @@ const AuthContext = createContext<AuthContextType>({
   token: null,
   login: () => { },
   logout: () => { },
-  isAuthenticated: false
+  isAuthenticated: false,
+  refreshUser: async () => { }
 });
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -40,8 +43,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('user');
   };
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await userApi.getProfile();
+      const freshUser = res.data;
+      setUser(freshUser);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+    } catch {
+      logout();
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token && user) {
+      refreshUser();
+    }
+  }, [token]);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

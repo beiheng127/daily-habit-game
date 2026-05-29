@@ -13,12 +13,19 @@ const CheckinPage: React.FC = () => {
   const [chartDays, setChartDays] = useState<7 | 30>(7);
   const [loading, setLoading] = useState(true);
 
+  const getCSTDateStr = (date?: Date) => {
+    const d = date || new Date();
+    const offset = d.getTimezoneOffset() * 60000;
+    const cst = new Date(d.getTime() - offset + 8 * 3600000);
+    return cst.toISOString().split('T')[0];
+  };
+
   const fetchHistory = useCallback(async () => {
     try {
-      const endDate = new Date().toISOString().split('T')[0];
+      const endDate = getCSTDateStr();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - (chartDays - 1));
-      const startStr = startDate.toISOString().split('T')[0];
+      const startStr = getCSTDateStr(startDate);
 
       const res = await checkinApi.getHistory({ startDate: startStr, endDate });
       setHistory(res.data);
@@ -29,10 +36,10 @@ const CheckinPage: React.FC = () => {
         countMap[c.date] = (countMap[c.date] || 0) + 1;
       });
 
-      const current = new Date(startStr);
-      const end = new Date(endDate);
+      const current = new Date(startStr + 'T00:00:00');
+      const end = new Date(endDate + 'T00:00:00');
       while (current <= end) {
-        const dateStr = current.toISOString().split('T')[0];
+        const dateStr = getCSTDateStr(current);
         data.push({ date: dateStr, count: countMap[dateStr] || 0 });
         current.setDate(current.getDate() + 1);
       }

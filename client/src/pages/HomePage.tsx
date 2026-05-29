@@ -1,23 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { checkinApi, gameApi } from '../services/api';
 import { TodayStatus, GameStatus } from '../types';
 import HabitCard from '../components/HabitCard';
 import LevelBadge from '../components/LevelBadge';
 import Skeleton from '../components/Skeleton';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const [todayStatus, setTodayStatus] = useState<TodayStatus | null>(null);
   const [gameStatus, setGameStatus] = useState<GameStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
-
-  const showToast = (message: string, type: string = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
-  };
+  const { toast, showToast } = useToast();
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,18 +58,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -60, opacity: 0 }}
-            className={'fixed top-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl shadow-lg text-white z-50 text-sm font-medium ' + (toast.type === 'success' ? 'bg-accent-500' : 'bg-red-500')}
-          >
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Toast toast={toast} />
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-xl font-bold text-gray-800 mb-2">👋 你好，{user?.nickname}</h1>
@@ -107,7 +93,7 @@ const HomePage: React.FC = () => {
           todayStatus?.checkins.map((c, i) => (
             <motion.div key={c.habitId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 + i * 0.05 }}>
               <HabitCard
-                habit={{ _id: c.habitId, name: c.habitName, icon: c.icon, color: c.color, currentStreak: 0, userId: '', frequency: 'daily', isArchived: false, createdAt: '' } as any}
+                habit={{ _id: c.habitId, name: c.habitName, icon: c.icon, color: c.color, currentStreak: c.currentStreak, userId: '', frequency: 'daily', isArchived: false, createdAt: '' } as any}
                 checkedIn={c.checkedIn}
                 onCheckin={handleCheckin}
               />
