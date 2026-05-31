@@ -15,15 +15,36 @@ const EXP_PER_LEVEL = 100;
 const COINS_DAILY_LOGIN = 10;
 const STREAK_BONUS_COINS = 3;
 
-/**
- * 增加经验值
- */
-const addExp = async (userId, amount) => {
-  const user = await User.findById(userId);
+const getCSTToday = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const cst = new Date(now.getTime() - offset + 8 * 3600000);
+  return cst.toISOString().split('T')[0];
+};
+
+const getUserById = async (userId, select = '') => {
+  const query = User.findById(userId);
+  if (select) query.select(select);
+  const user = await query;
   if (!user) {
     throw { status: 404, message: '用户不存在' };
   }
+  return user;
+};
 
+const calculateProgress = (user, condition) => {
+  const progressMap = {
+    totalCheckins: user.totalCheckins,
+    streak: user.streak,
+    level: user.level,
+    coins: user.coins,
+    habits: user.totalCheckins
+  };
+  return progressMap[condition.type] || 0;
+};
+
+const addExp = async (userId, amount) => {
+  const user = await getUserById(userId);
   const newExp = user.exp + amount;
   const { level: newLevel } = UserService.calculateLevel(newExp);
   const leveledUp = newLevel > user.level;
@@ -35,39 +56,25 @@ const addExp = async (userId, amount) => {
   return { newExp, newLevel, leveledUp };
 };
 
-/**
- * 增加金币
- */
 const addCoins = async (userId, amount) => {
-  const user = await User.findById(userId);
-  if (!user) {
-    throw { status: 404, message: '用户不存在' };
-  }
-
+  const user = await getUserById(userId);
   user.coins += amount;
   await user.save();
-
   return { newCoins: user.coins };
 };
 
-/**
- * 获取游戏状态概览
- */
 const getGameStatus = async (userId) => {
-  const user = await User.findById(userId).select('level exp coins streak totalCheckins');
-  if (!user) {
-    throw { status: 404, message: '用户不存在' };
-  }
-
+  const user = await getUserById(userId, 'level exp coins streak totalCheckins');
   const { expToNext, expProgress } = UserService.calculateLevel(user.exp);
 
-  const totalAchievements = await Achievement.countDocuments();
-  const unlockedCount = await UserAchievement.countDocuments({ userId });
-
-  const recentAchievements = await UserAchievement.find({ userId })
-    .populate('achievementId', 'name icon')
-    .sort({ unlockedAt: -1 })
-    .limit(3);
+  const [totalAchievements, userAchievements] = await Promise.all([
+    Achievement.countDocuments(),
+    UserAchievement.find({ userId })
+      .populate('achievementId', 'name icon')
+      .sort({ unlockedAt: -1 })
+      .limit(3)
+      .lean()
+  ]);
 
   return {
     level: user.level,
@@ -77,58 +84,28 @@ const getGameStatus = async (userId) => {
     coins: user.coins,
     streak: user.streak,
     totalCheckins: user.totalCheckins,
-    unlockedCount,
+    unlockedCount: userAchievements.length,
     totalAchievements,
-    recentAchievements: recentAchievements.map(ua => ({
-      name: ua.achievementId.name,
-      icon: ua.achievementId.icon,
-      unlockedAt: ua.unlockedAt.toISOString().split('T')[0]
+    recentAchievements: userAchievements.map(ua => ({
+      name: ua.achievementId?.name || '',
+      icon: ua.achievementId?.icon || '',
+      unlockedAt: ua.unlockedAt?.toISOString().split('T')[0] || ''
     }))
   };
 };
 
-/**
- * 获取成就列表（含解锁状态和进度）
- */
 const getAllAchievements = async (userId) => {
-  const user = await User.findById(userId).select('streak totalCheckins coins level');
+  const user = await getUserById(userId, 'streak totalCheckins coins level');
   const allAchievements = await Achievement.find();
   const userAchievements = await UserAchievement.find({ userId });
 
-  const unlockedMap = {};
-  userAchievements.forEach(ua => {
-    unlockedMap[ua.achievementId.toString()] = ua;
-  });
+  const unlockedMap = new Map(userAchievements.map(ua => [ua.achievementId.toString(), ua]));
 
   return allAchievements.map(ach => {
-    const unlocked = !!unlockedMap[ach._id.toString()];
-    let progress = 0;
-    let target = ach.condition.value || 0;
-
-    // 计算当前进度
-    switch (ach.condition.type) {
-      case 'totalCheckins':
-        progress = user.totalCheckins;
-        target = ach.condition.value;
-        break;
-      case 'streak':
-        progress = user.streak;
-        target = ach.condition.value;
-        break;
-      case 'level':
-        progress = user.level;
-        target = ach.condition.value;
-        break;
-      case 'coins':
-        progress = user.coins;
-        target = ach.condition.value;
-        break;
-      case 'habits':
-        // habits 条件使用 totalCheckins 作为替代判定
-        progress = user.totalCheckins;
-        target = ach.condition.value;
-        break;
-    }
+    const key = ach._id.toString();
+    const unlocked = unlockedMap.has(key);
+    const target = ach.condition.value || 0;
+    const progress = unlocked ? target : Math.min(calculateProgress(user, ach.condition), target);
 
     return {
       achievementId: ach._id,
@@ -137,50 +114,29 @@ const getAllAchievements = async (userId) => {
       description: ach.description,
       icon: ach.icon,
       unlocked,
-      unlockedAt: unlocked ? unlockedMap[ach._id.toString()].unlockedAt : null,
-      progress: unlocked ? target : Math.min(progress, target),
+      unlockedAt: unlocked ? unlockedMap.get(key).unlockedAt : null,
+      progress,
       target
     };
   });
 };
 
-/**
- * 检测并解锁成就
- */
 const checkAchievements = async (userId) => {
   const user = await User.findById(userId);
   if (!user) return { newUnlocks: [] };
 
   const allAchievements = await Achievement.find();
   const unlockedIds = await UserAchievement.find({ userId }).distinct('achievementId');
+  const unlockedSet = new Set(unlockedIds.map(id => id.toString()));
   const newUnlocks = [];
 
   for (const ach of allAchievements) {
-    // 跳过已解锁的成就
-    if (unlockedIds.some(id => id.toString() === ach._id.toString())) continue;
+    if (unlockedSet.has(ach._id.toString())) continue;
 
-    let satisfied = false;
-    switch (ach.condition.type) {
-      case 'totalCheckins':
-        satisfied = user.totalCheckins >= ach.condition.value;
-        break;
-      case 'streak':
-        satisfied = user.streak >= ach.condition.value;
-        break;
-      case 'level':
-        satisfied = user.level >= ach.condition.value;
-        break;
-      case 'coins':
-        satisfied = user.coins >= ach.condition.value;
-        break;
-      case 'habits':
-        satisfied = user.totalCheckins >= ach.condition.value;
-        break;
-    }
+    const satisfied = calculateProgress(user, ach.condition) >= ach.condition.value;
 
     if (satisfied) {
       await UserAchievement.create({ userId, achievementId: ach._id });
-      // 发放成就奖励
       if (ach.reward.exp > 0) await addExp(userId, ach.reward.exp);
       if (ach.reward.coins > 0) await addCoins(userId, ach.reward.coins);
       newUnlocks.push({
@@ -196,26 +152,9 @@ const checkAchievements = async (userId) => {
   return { newUnlocks };
 };
 
-/**
- * 领取每日登录奖励
- */
-/**
- * 获取东八区今日日期字符串
- */
-const getCSTToday = () => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60000;
-  const cst = new Date(now.getTime() - offset + 8 * 3600000);
-  return cst.toISOString().split('T')[0];
-};
-
 const claimDailyLogin = async (userId) => {
   const today = getCSTToday();
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw { status: 404, message: '用户不存在' };
-  }
+  const user = await getUserById(userId);
 
   if (user.lastLoginDate === today) {
     return { coins: 0, claimed: false, message: '今日已领取' };
@@ -236,8 +175,7 @@ const SHOP_ITEMS = [
 ];
 
 const getShopItems = async (userId) => {
-  const user = await User.findById(userId).select('coins inventory activeFrame activeTheme');
-  if (!user) throw { status: 404, message: '用户不存在' };
+  const user = await getUserById(userId, 'coins inventory activeFrame activeTheme');
 
   return SHOP_ITEMS.map(item => {
     const owned = item.type === 'avatarFrames'
@@ -246,9 +184,8 @@ const getShopItems = async (userId) => {
       ? user.inventory.themeColors.includes(item.value)
       : false;
 
-    let equipped = false;
-    if (item.type === 'avatarFrames') equipped = user.activeFrame === item.value;
-    if (item.type === 'themeColors') equipped = user.activeTheme === item.value;
+    const equipped = (item.type === 'avatarFrames' && user.activeFrame === item.value) ||
+                     (item.type === 'themeColors' && user.activeTheme === item.value);
 
     return { ...item, owned, equipped };
   });
@@ -258,76 +195,69 @@ const buyItem = async (userId, itemId) => {
   const item = SHOP_ITEMS.find(i => i.id === itemId);
   if (!item) throw { status: 404, message: '商品不存在' };
 
-  const user = await User.findById(userId);
-  if (!user) throw { status: 404, message: '用户不存在' };
-
+  const user = await getUserById(userId);
   if (user.coins < item.price) throw { status: 400, message: '金币不足' };
 
+  const inventory = user.inventory;
   if (item.type === 'avatarFrames') {
-    if (user.inventory.avatarFrames.includes(item.value)) {
+    if (inventory.avatarFrames.includes(item.value)) {
       throw { status: 400, message: '已拥有该头像框' };
     }
-    user.inventory.avatarFrames.push(item.value);
+    inventory.avatarFrames.push(item.value);
   } else if (item.type === 'themeColors') {
-    if (user.inventory.themeColors.includes(item.value)) {
+    if (inventory.themeColors.includes(item.value)) {
       throw { status: 400, message: '已拥有该主题色' };
     }
-    user.inventory.themeColors.push(item.value);
+    inventory.themeColors.push(item.value);
   } else if (item.type === 'skipCards') {
-    user.inventory.skipCards += 1;
+    inventory.skipCards += 1;
   } else if (item.type === 'renameCards') {
-    user.inventory.renameCards += 1;
+    inventory.renameCards += 1;
   }
 
   user.coins -= item.price;
   await user.save();
 
-  return { message: `成功购买 ${item.name}！`, newCoins: user.coins, inventory: user.inventory };
+  return { message: `成功购买 ${item.name}！`, newCoins: user.coins, inventory };
 };
 
-/**
- * 使用背包物品
- * itemType: 'renameCard' | 'avatarFrame' | 'theme'
- * itemValue: 具体值（头像框名称/主题色名）
- */
 const useItem = async (userId, itemType, itemValue) => {
-  const user = await User.findById(userId);
-  if (!user) throw { status: 404, message: '用户不存在' };
+  const user = await getUserById(userId);
 
-  switch (itemType) {
-    case 'renameCard': {
-      // 使用改名卡：消耗一张，前端传入新昵称 newName
+  const handlers = {
+    renameCard: () => {
       if (!itemValue) throw { status: 400, message: '请输入新昵称' };
       if (user.inventory.renameCards <= 0) {
         throw { status: 400, message: '没有改名卡' };
       }
       user.inventory.renameCards -= 1;
       user.nickname = itemValue;
-      break;
-    }
-    case 'avatarFrame': {
-      // 装备头像框
+      return '昵称修改成功';
+    },
+    avatarFrame: () => {
       if (!user.inventory.avatarFrames.includes(itemValue)) {
         throw { status: 400, message: '未拥有该头像框' };
       }
       user.activeFrame = user.activeFrame === itemValue ? '' : itemValue;
-      break;
-    }
-    case 'theme': {
-      // 装备主题色
+      return '装备切换成功';
+    },
+    theme: () => {
       if (!user.inventory.themeColors.includes(itemValue)) {
         throw { status: 400, message: '未拥有该主题' };
       }
       user.activeTheme = user.activeTheme === itemValue ? '' : itemValue;
-      break;
+      return '装备切换成功';
     }
-    default:
-      throw { status: 400, message: '未知物品类型' };
-  }
+  };
 
+  const handler = handlers[itemType];
+  if (!handler) throw { status: 400, message: '未知物品类型' };
+
+  const message = handler();
   await user.save();
+
   return {
-    message: itemType === 'renameCard' ? '昵称修改成功' : '装备切换成功',
+    message,
     activeFrame: user.activeFrame,
     activeTheme: user.activeTheme,
     nickname: user.nickname,
@@ -336,9 +266,6 @@ const useItem = async (userId, itemType, itemValue) => {
 };
 
 const getLeaderboard = async (period = 'all') => {
-  let matchStage = {};
-
-  // 周榜/月榜：按打卡记录聚合，统计该时段内打卡次数
   if (period === 'weekly' || period === 'monthly') {
     const Checkin = require('../models/Checkin');
     const now = new Date();
@@ -347,14 +274,9 @@ const getLeaderboard = async (period = 'all') => {
     const todayStr = cst.toISOString().split('T')[0];
 
     const startDate = new Date(cst);
-    if (period === 'weekly') {
-      startDate.setDate(startDate.getDate() - 7);
-    } else {
-      startDate.setDate(startDate.getDate() - 30);
-    }
+    startDate.setDate(startDate.getDate() - (period === 'weekly' ? 7 : 30));
     const startStr = startDate.toISOString().split('T')[0];
 
-    // 聚合该时段内每个用户的打卡次数
     const aggregations = await Checkin.aggregate([
       { $match: { date: { $gte: startStr, $lte: todayStr } } },
       { $group: { _id: '$userId', count: { $sum: 1 } } },
@@ -362,17 +284,15 @@ const getLeaderboard = async (period = 'all') => {
       { $limit: 20 }
     ]);
 
-    // 填充用户信息
     const userIds = aggregations.map(a => a._id);
     const users = await User.find({ _id: { $in: userIds } })
       .select('username nickname level')
       .lean();
 
-    const userMap = {};
-    users.forEach(u => { userMap[u._id.toString()] = u; });
+    const userMap = new Map(users.map(u => [u._id.toString(), u]));
 
     return aggregations.map((a, i) => {
-      const u = userMap[a._id.toString()];
+      const u = userMap.get(a._id.toString());
       return {
         rank: i + 1,
         userId: a._id,
@@ -385,7 +305,6 @@ const getLeaderboard = async (period = 'all') => {
     });
   }
 
-  // 全部排行（按等级+总打卡数）
   const users = await User.find({})
     .select('username nickname level totalCheckins')
     .sort({ level: -1, totalCheckins: -1 })
